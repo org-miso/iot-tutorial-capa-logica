@@ -7,6 +7,7 @@ import paho.mqtt.client as mqtt
 import schedule
 import time
 from django.conf import settings
+from statistics import mean
 
 client = mqtt.Client(settings.MQTT_USER_PUB)
 
@@ -59,6 +60,28 @@ def analyze_data():
     print(alerts, "alertas enviadas")
 
 
+def calculate_temperature_duration_below_average():
+    # Consulta todos los datos de temperatura de las últimas 2 horas
+    temperature_data = Data.objects.values('avg_value')
+  
+    print(str(temperature_data))
+    # Calcula el promedio de la temperatura
+    avg_values = [item['avg_value'] for item in temperature_data]
+    print(str(avg_values))
+    count_above_25 = len([value for value in avg_values if value > 25])
+    # Calcula el promedio de temperatura  
+    
+    # Construir y enviar mensaje de alerta (puedes adaptar esta parte según tus necesidades)
+    if count_above_25 > 0:
+        message = f"Riesgo de temperatura alta"
+        topic = '{}/{}/{}/{}/in'.format('espania', 'leon', 'leon', 'user1')
+        print(datetime.now(), "Sending temperature alert:", message)
+        client.publish(topic, message)
+    else:
+        print(datetime.now(), "No temperature alert to send")
+
+
+
 def on_connect(client, userdata, flags, rc):
     '''
     Función que se ejecuta cuando se conecta al bróker.
@@ -106,6 +129,8 @@ def start_cron():
     '''
     print("Iniciando cron...")
     schedule.every().hour.do(analyze_data)
+    schedule.every(1).minutes.do(calculate_temperature_duration_below_average)
+
     print("Servicio de control iniciado")
     while 1:
         schedule.run_pending()
